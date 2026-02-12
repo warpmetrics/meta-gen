@@ -11,7 +11,13 @@ export async function analyzeCommand(options) {
     const config = JSON.parse(await fs.readFile('./meta-gen.config.json', 'utf-8'));
 
     const gsc = new GSCClient('./.gsc-credentials.json');
-    await gsc.authenticate();
+    const authenticated = await gsc.authenticate();
+
+    if (!authenticated) {
+      spinner.fail('Authentication failed');
+      console.log(chalk.yellow('\nRun meta-gen auth first to authenticate with Google Search Console'));
+      process.exit(1);
+    }
 
     spinner.text = 'Fetching performance data from Google Search Console...';
 
