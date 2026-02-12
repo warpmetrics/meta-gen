@@ -1,9 +1,10 @@
-import { GSCClient } from '../core/gsc-client.js';
-import { MetaGenerator } from '../core/generator.js';
-import { PerformanceTracker } from '../core/tracker.js';
-import { Improver } from '../core/improver.js';
-import { PromptManager } from '../core/prompt-manager.js';
-import { run, group, outcome, act, flush } from '@warpmetrics/warp';
+import { createGSCClient } from '../core/gsc-client.js';
+import { generate } from '../core/generator.js';
+import { trackPerformance } from '../core/tracker.js';
+import { analyze } from '../core/improver.js';
+import { createPromptManager } from '../core/prompt-manager.js';
+import OpenAI from 'openai';
+import { warp, run, group, outcome, act, flush } from '@warpmetrics/warp';
 import chalk from 'chalk';
 import ora from 'ora';
 import fs from 'fs/promises';
@@ -22,10 +23,8 @@ function extractPageContent(html) {
   const title = $('title').first().text().trim() || null;
   const description = $('meta[name="description"]').attr('content')?.trim() || null;
 
-  // Remove non-content elements before conversion
   $('script, style, svg, nav, header, footer, aside, noscript, iframe, [role="navigation"], [aria-hidden="true"]').remove();
 
-  // Prefer main content area
   const mainEl = $('main, [role="main"], article').first();
   const contentHtml = mainEl.length ? mainEl.html() : $('body').html();
 
@@ -59,11 +58,15 @@ export async function runCommand(options) {
       : run('Meta Gen', { domain: config.domain });
 
     // Setup
-    const gsc = new GSCClient('./.gsc-credentials.json');
+    const openai = warp(new OpenAI({ apiKey: process.env.OPENAI_API_KEY }), {
+      apiKey: process.env.WARPMETRICS_API_KEY
+    });
+
+    const gsc = createGSCClient('./.gsc-credentials.json');
     await gsc.authenticate();
 
-    const promptManager = new PromptManager('.');
-    await promptManager.initialize();
+    const prompts = createPromptManager('.');
+    await prompts.initialize();
 
     // Load meta.json
     let metaJson = {};
@@ -76,9 +79,9 @@ export async function runCommand(options) {
     // ═══════════════════════════════════════════
     spinner.text = 'Collecting feedback...';
     const feedbackGrp = group(r, 'Feedback');
-    const tracker = new PerformanceTracker(gsc);
 
-    const feedbackResults = await tracker.trackPerformance(
+    const feedbackResults = await trackPerformance(
+      gsc,
       feedbackGrp,
       config.siteUrl,
       metaJson,
@@ -96,13 +99,14 @@ export async function runCommand(options) {
     // ═══════════════════════════════════════════
     spinner.start('Analyzing patterns...');
     const learnGrp = group(r, 'Learn');
-    const improver = new Improver(
-      process.env.WARPMETRICS_API_KEY,
-      process.env.OPENAI_API_KEY,
-      promptManager
-    );
 
-    const learnResults = await improver.analyze(learnGrp, config.domain);
+    const learnResults = await analyze(
+      openai,
+      process.env.WARPMETRICS_API_KEY,
+      prompts,
+      learnGrp,
+      config.domain
+    );
 
     if (learnResults) {
       spinner.succeed(`Learn: ${learnResults.patternsLearned} patterns learned`);
@@ -146,21 +150,12 @@ export async function runCommand(options) {
           const html = await res.text();
           const { title, description, content } = extractPageContent(html);
 
-          const enriched = {
+          return {
             ...page,
             currentTitle: title,
             currentDescription: description,
             content: content.substring(0, 3000)
           };
-
-          // Attach failure history from meta.json if this page previously failed
-          const pathname = new URL(page.url).pathname;
-          const existing = metaJson[pathname];
-          if (existing?.failed) {
-            enriched.previousFailures = existing.failures;
-          }
-
-          return enriched;
         } catch (err) {
           return page;
         }
@@ -169,13 +164,7 @@ export async function runCommand(options) {
 
     spinner.text = 'Generating descriptions...';
 
-    const generator = new MetaGenerator(
-      process.env.OPENAI_API_KEY,
-      process.env.WARPMETRICS_API_KEY,
-      promptManager
-    );
-
-    const genResults = await generator.generate(generateGrp, enrichedCandidates, {
+    const genResults = await generate(openai, prompts, generateGrp, enrichedCandidates, {
       domain: config.domain,
       maxRetries: parseInt(options.maxRetries) || 3
     });
@@ -189,7 +178,6 @@ export async function runCommand(options) {
     // Update meta.json
     // ═══════════════════════════════════════════
 
-    // Save successful generations (keyed by pathname so the frontend can look them up)
     for (const result of genResults.results) {
       const pathname = new URL(result.url).pathname;
       metaJson[pathname] = {
@@ -201,19 +189,6 @@ export async function runCommand(options) {
           ctr: result.currentCTR,
           impressions: result.impressions
         }
-      };
-    }
-
-    // Save failures so the next run can include failure history in the prompt
-    for (const failure of genResults.failures) {
-      const pathname = new URL(failure.url).pathname;
-      metaJson[pathname] = {
-        failed: true,
-        failedAt: new Date().toISOString(),
-        runId: r.id,
-        attempts: failure.attempts,
-        lastReason: failure.lastReason,
-        failures: failure.history
       };
     }
 

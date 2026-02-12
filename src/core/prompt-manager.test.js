@@ -22,9 +22,8 @@ vi.mock('fs/promises', () => {
 });
 
 import fs from 'fs/promises';
-import { PromptManager } from './prompt-manager.js';
+import { createPromptManager } from './prompt-manager.js';
 
-// Access the backing store for test assertions
 const { __store: store } = await import('fs/promises');
 
 beforeEach(() => {
@@ -32,12 +31,12 @@ beforeEach(() => {
   for (const key of Object.keys(store)) delete store[key];
 });
 
-describe('PromptManager', () => {
+describe('createPromptManager', () => {
   const configDir = '/test';
   let pm;
 
   beforeEach(() => {
-    pm = new PromptManager(configDir);
+    pm = createPromptManager(configDir);
   });
 
   describe('initialize', () => {
@@ -45,7 +44,6 @@ describe('PromptManager', () => {
       await pm.initialize();
 
       expect(fs.mkdir).toHaveBeenCalledWith('/test/prompts', { recursive: true });
-      // Should have written base.md, quality.md, patterns.json
       expect(fs.writeFile).toHaveBeenCalledTimes(3);
       expect(store['/test/prompts/patterns.json']).toContain('"patterns"');
     });
@@ -57,7 +55,6 @@ describe('PromptManager', () => {
 
       await pm.initialize();
 
-      // access succeeds for all 3 → no writeFile calls
       expect(fs.writeFile).not.toHaveBeenCalled();
     });
   });
@@ -88,7 +85,6 @@ describe('PromptManager', () => {
       expect(prompt).toContain('Use numbers');
       expect(prompt).toContain('2.1x CTR');
     });
-
   });
 
   describe('addPattern', () => {
@@ -110,14 +106,12 @@ describe('PromptManager', () => {
 
       await pm.updateQualityPrompt('new quality content');
 
-      // Old content backed up with date-stamped name
       const backupCalls = fs.writeFile.mock.calls.filter(
         ([p]) => p.includes('quality-') && p.endsWith('.md')
       );
       expect(backupCalls).toHaveLength(1);
       expect(backupCalls[0][1]).toBe('old quality content');
 
-      // New content written
       expect(store['/test/prompts/quality.md']).toBe('new quality content');
     });
   });

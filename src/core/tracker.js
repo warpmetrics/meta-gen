@@ -1,98 +1,89 @@
 // Tracks performance of past generations against GSC data
 import { outcome } from '@warpmetrics/warp';
 
-export class PerformanceTracker {
-  constructor(gscClient) {
-    this.gscClient = gscClient;
+export async function trackPerformance(gscClient, grp, siteUrl, metaJson, minDays = 7) {
+  const now = Date.now();
+
+  const eligible = Object.entries(metaJson)
+    .filter(([, meta]) => {
+      if (meta.failed || !meta.generatedAt || !meta.runId) return false;
+      const daysAgo = (now - new Date(meta.generatedAt).getTime()) / (1000 * 60 * 60 * 24);
+      return daysAgo >= minDays;
+    })
+    .map(([pathname, meta]) => ({ pathname, ...meta }));
+
+  if (eligible.length === 0) {
+    return { tracked: 0, highPerformers: 0 };
   }
 
-  async trackPerformance(grp, siteUrl, metaJson, minDays = 7) {
-    const now = Date.now();
+  const startDate = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const endDate = new Date().toISOString().split('T')[0];
+  const domain = siteUrl.replace('sc-domain:', 'https://');
 
-    // Find pages eligible for feedback: generated 7+ days ago, not failed
-    const eligible = Object.entries(metaJson)
-      .filter(([, meta]) => {
-        if (meta.failed || !meta.generatedAt || !meta.runId) return false;
-        const daysAgo = (now - new Date(meta.generatedAt).getTime()) / (1000 * 60 * 60 * 24);
-        return daysAgo >= minDays;
-      })
-      .map(([pathname, meta]) => ({ pathname, ...meta }));
+  const results = await parallel(eligible, 5, async (page) => {
+    const fullUrl = `${domain}${page.pathname}`;
+    const perf = await gscClient.getPagePerformanceByPage(
+      siteUrl, fullUrl, startDate, endDate
+    );
+    return { page, perf };
+  });
 
-    if (eligible.length === 0) {
-      return { tracked: 0, highPerformers: 0 };
+  let tracked = 0;
+  let highPerformers = 0;
+
+  for (const { page, perf } of results) {
+    if (!perf || perf.impressions < 10) {
+      outcome(grp, 'Insufficient Data', {
+        page: page.pathname,
+        reason: perf ? 'Low impressions' : 'No data from GSC',
+        generationRunId: page.runId
+      });
+      continue;
     }
 
-    const startDate = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const endDate = new Date().toISOString().split('T')[0];
-    const domain = siteUrl.replace('sc-domain:', 'https://');
+    const currentCTR = perf.ctr;
+    const baselineCTR = page.baseline?.ctr || 0;
 
-    // Fetch GSC data for all eligible pages in parallel (5 at a time)
-    const results = await parallel(eligible, 5, async (page) => {
-      const fullUrl = `${domain}${page.pathname}`;
-      const perf = await this.gscClient.getPagePerformanceByPage(
-        siteUrl, fullUrl, startDate, endDate
-      );
-      return { page, perf };
-    });
+    const hasBaseline = baselineCTR > 0;
+    const improvement = hasBaseline
+      ? (currentCTR - baselineCTR) / baselineCTR
+      : null;
 
-    let tracked = 0;
-    let highPerformers = 0;
+    const opts = {
+      page: page.pathname,
+      title: page.title,
+      description: page.description,
+      ctr: currentCTR,
+      baselineCTR,
+      improvement: improvement !== null
+        ? `${improvement > 0 ? '+' : ''}${(improvement * 100).toFixed(0)}%`
+        : 'no baseline',
+      impressions: perf.impressions,
+      generationRunId: page.runId
+    };
 
-    for (const { page, perf } of results) {
-      if (!perf || perf.impressions < 10) {
-        outcome(grp, 'Insufficient Data', {
-          page: page.pathname,
-          reason: perf ? 'Low impressions' : 'No data from GSC',
-          generationRunId: page.runId
-        });
-        continue;
-      }
-
-      const currentCTR = perf.ctr;
-      const baselineCTR = page.baseline?.ctr || 0;
-
-      // When baseline is 0 (first generation), use absolute CTR to classify
-      const hasBaseline = baselineCTR > 0;
-      const improvement = hasBaseline
-        ? (currentCTR - baselineCTR) / baselineCTR
-        : null;
-
-      const opts = {
-        page: page.pathname,
-        title: page.title,
-        description: page.description,
-        ctr: currentCTR,
-        baselineCTR,
-        improvement: improvement !== null
-          ? `${improvement > 0 ? '+' : ''}${(improvement * 100).toFixed(0)}%`
-          : 'no baseline',
-        impressions: perf.impressions,
-        generationRunId: page.runId
-      };
-
-      if (!hasBaseline) {
-        if (currentCTR >= 0.05) {
-          outcome(grp, 'High CTR', opts);
-          highPerformers++;
-        } else if (currentCTR >= 0.03) {
-          outcome(grp, 'Improved', opts);
-        } else {
-          outcome(grp, 'No Improvement', opts);
-        }
-      } else if (improvement > 0.2) {
+    if (!hasBaseline) {
+      if (currentCTR >= 0.05) {
         outcome(grp, 'High CTR', opts);
         highPerformers++;
-      } else if (improvement > 0) {
+      } else if (currentCTR >= 0.03) {
         outcome(grp, 'Improved', opts);
       } else {
         outcome(grp, 'No Improvement', opts);
       }
-
-      tracked++;
+    } else if (improvement > 0.2) {
+      outcome(grp, 'High CTR', opts);
+      highPerformers++;
+    } else if (improvement > 0) {
+      outcome(grp, 'Improved', opts);
+    } else {
+      outcome(grp, 'No Improvement', opts);
     }
 
-    return { tracked, highPerformers };
+    tracked++;
   }
+
+  return { tracked, highPerformers };
 }
 
 // Run async tasks with a concurrency limit

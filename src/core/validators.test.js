@@ -86,5 +86,4 @@ describe('qualityValidator', () => {
     const result = await validate(generated, page, ctx);
     expect(result.pass).toBe(true);
   });
-
 });

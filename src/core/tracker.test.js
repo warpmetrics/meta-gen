@@ -5,7 +5,7 @@ vi.mock('@warpmetrics/warp', () => ({
 }));
 
 import { outcome } from '@warpmetrics/warp';
-import { PerformanceTracker } from './tracker.js';
+import { trackPerformance } from './tracker.js';
 
 function makeGscClient(perfByPage = {}) {
   return {
@@ -22,23 +22,20 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe('PerformanceTracker', () => {
+describe('trackPerformance', () => {
   it('returns zeros when no pages are eligible', async () => {
-    const tracker = new PerformanceTracker(makeGscClient());
-
-    const result = await tracker.trackPerformance(grp, siteUrl, {
+    const result = await trackPerformance(makeGscClient(), grp, siteUrl, {
       '/old': { failed: true },
-      '/new': { generatedAt: new Date().toISOString(), runId: 'r1' }, // too recent
+      '/new': { generatedAt: new Date().toISOString(), runId: 'r1' },
     }, 7);
 
     expect(result).toEqual({ tracked: 0, highPerformers: 0 });
   });
 
   it('filters out failed entries', async () => {
-    const tracker = new PerformanceTracker(makeGscClient());
     const oldDate = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString();
 
-    const result = await tracker.trackPerformance(grp, siteUrl, {
+    const result = await trackPerformance(makeGscClient(), grp, siteUrl, {
       '/page': { failed: true, generatedAt: oldDate, runId: 'r1' },
     }, 7);
 
@@ -50,9 +47,8 @@ describe('PerformanceTracker', () => {
     const gsc = makeGscClient({
       'https://example.com/page': { ctr: 0.05, impressions: 100 },
     });
-    const tracker = new PerformanceTracker(gsc);
 
-    const result = await tracker.trackPerformance(grp, siteUrl, {
+    const result = await trackPerformance(gsc, grp, siteUrl, {
       '/page': {
         generatedAt: oldDate,
         runId: 'r1',
@@ -71,9 +67,8 @@ describe('PerformanceTracker', () => {
     const gsc = makeGscClient({
       'https://example.com/page': { ctr: 0.035, impressions: 100 },
     });
-    const tracker = new PerformanceTracker(gsc);
 
-    const result = await tracker.trackPerformance(grp, siteUrl, {
+    const result = await trackPerformance(gsc, grp, siteUrl, {
       '/page': {
         generatedAt: oldDate,
         runId: 'r1',
@@ -92,9 +87,8 @@ describe('PerformanceTracker', () => {
     const gsc = makeGscClient({
       'https://example.com/page': { ctr: 0.02, impressions: 100 },
     });
-    const tracker = new PerformanceTracker(gsc);
 
-    const result = await tracker.trackPerformance(grp, siteUrl, {
+    const result = await trackPerformance(gsc, grp, siteUrl, {
       '/page': {
         generatedAt: oldDate,
         runId: 'r1',
@@ -113,9 +107,8 @@ describe('PerformanceTracker', () => {
     const gsc = makeGscClient({
       'https://example.com/page': { ctr: 0.06, impressions: 50 },
     });
-    const tracker = new PerformanceTracker(gsc);
 
-    const result = await tracker.trackPerformance(grp, siteUrl, {
+    const result = await trackPerformance(gsc, grp, siteUrl, {
       '/page': {
         generatedAt: oldDate,
         runId: 'r1',
@@ -133,9 +126,8 @@ describe('PerformanceTracker', () => {
     const gsc = makeGscClient({
       'https://example.com/page': { ctr: 0.04, impressions: 50 },
     });
-    const tracker = new PerformanceTracker(gsc);
 
-    const result = await tracker.trackPerformance(grp, siteUrl, {
+    const result = await trackPerformance(gsc, grp, siteUrl, {
       '/page': {
         generatedAt: oldDate,
         runId: 'r1',
@@ -153,9 +145,8 @@ describe('PerformanceTracker', () => {
     const gsc = makeGscClient({
       'https://example.com/page': { ctr: 0.02, impressions: 50 },
     });
-    const tracker = new PerformanceTracker(gsc);
 
-    const result = await tracker.trackPerformance(grp, siteUrl, {
+    const result = await trackPerformance(gsc, grp, siteUrl, {
       '/page': {
         generatedAt: oldDate,
         runId: 'r1',
@@ -170,10 +161,8 @@ describe('PerformanceTracker', () => {
 
   it('records insufficient data when GSC returns null', async () => {
     const oldDate = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString();
-    const gsc = makeGscClient({}); // returns null for all pages
-    const tracker = new PerformanceTracker(gsc);
 
-    const result = await tracker.trackPerformance(grp, siteUrl, {
+    const result = await trackPerformance(makeGscClient({}), grp, siteUrl, {
       '/page': { generatedAt: oldDate, runId: 'r1' },
     }, 7);
 
@@ -189,9 +178,8 @@ describe('PerformanceTracker', () => {
     const gsc = makeGscClient({
       'https://example.com/page': { ctr: 0.05, impressions: 5 },
     });
-    const tracker = new PerformanceTracker(gsc);
 
-    const result = await tracker.trackPerformance(grp, siteUrl, {
+    const result = await trackPerformance(gsc, grp, siteUrl, {
       '/page': { generatedAt: oldDate, runId: 'r1' },
     }, 7);
 

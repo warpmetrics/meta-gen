@@ -1,6 +1,6 @@
 // Main exports
-export { GSCClient } from './core/gsc-client.js';
-export { MetaGenerator } from './core/generator.js';
-export { PromptManager } from './core/prompt-manager.js';
-export { PerformanceTracker } from './core/tracker.js';
-export { Improver } from './core/improver.js';
+export { createGSCClient } from './core/gsc-client.js';
+export { generate, buildUserPrompt } from './core/generator.js';
+export { createPromptManager } from './core/prompt-manager.js';
+export { trackPerformance } from './core/tracker.js';
+export { analyze } from './core/improver.js';

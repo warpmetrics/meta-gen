@@ -1,4 +1,4 @@
-import { GSCClient } from '../core/gsc-client.js';
+import { createGSCClient } from '../core/gsc-client.js';
 import chalk from 'chalk';
 import ora from 'ora';
 import fs from 'fs/promises';
@@ -7,10 +7,9 @@ export async function analyzeCommand(options) {
   const spinner = ora('Loading configuration...').start();
 
   try {
-    // Load config
     const config = JSON.parse(await fs.readFile('./meta-gen.config.json', 'utf-8'));
 
-    const gsc = new GSCClient('./.gsc-credentials.json');
+    const gsc = createGSCClient('./.gsc-credentials.json');
 
     spinner.text = 'Authenticating with Google Search Console...';
     await gsc.authenticate();
@@ -36,10 +35,8 @@ export async function analyzeCommand(options) {
 
     const filtered = rows
       .filter(row => {
-        // Check impressions threshold
         if (row.impressions < minImpressions) return false;
 
-        // Check exclude patterns
         const url = row.keys[0];
         const pathname = new URL(url).pathname;
         const shouldExclude = excludePatterns.some(pattern => {

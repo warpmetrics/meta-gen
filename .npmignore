@@ -2,9 +2,8 @@
 test-data.js
 *.test.js
 
-# Example workflows (users should copy these, not use from package)
-.github/workflows/meta-generate.yml
-.github/workflows/meta-feedback.yml
+# Workflows (not needed in published package)
+.github/
 
 # Development files
 .gsc-credentials.json

@@ -1,4 +1,4 @@
-import { GSCClient } from '../core/gsc-client.js';
+import { createGSCClient } from '../core/gsc-client.js';
 import chalk from 'chalk';
 import ora from 'ora';
 
@@ -6,7 +6,7 @@ export async function authCommand() {
   const spinner = ora('Authenticating with Google Search Console...').start();
 
   try {
-    const client = new GSCClient('./.gsc-credentials.json');
+    const client = createGSCClient('./.gsc-credentials.json');
 
     // Check if already authenticated
     try {

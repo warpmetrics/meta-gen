@@ -4,24 +4,18 @@ import fs from 'fs/promises';
 import { createServer } from 'http';
 import open from 'open';
 
-export class GSCClient {
-  constructor(credentialsPath) {
-    this.credentialsPath = credentialsPath;
-    this.auth = null;
-    this.searchconsole = null;
-  }
+export function createGSCClient(credentialsPath) {
+  let auth = null;
+  let searchconsole = null;
 
-  async authenticate() {
-    // Check if credentials exist
+  async function authenticate() {
     try {
-      const creds = JSON.parse(await fs.readFile(this.credentialsPath, 'utf-8'));
+      const creds = JSON.parse(await fs.readFile(credentialsPath, 'utf-8'));
 
-      // Check if we have the required env vars for token-based auth
       if (!process.env.GSC_CLIENT_ID || !process.env.GSC_CLIENT_SECRET) {
         throw new Error('GSC_CLIENT_ID and GSC_CLIENT_SECRET environment variables must be set');
       }
 
-      // Create OAuth2 client and set stored credentials
       const oauth2Client = new google.auth.OAuth2(
         process.env.GSC_CLIENT_ID,
         process.env.GSC_CLIENT_SECRET,
@@ -29,20 +23,18 @@ export class GSCClient {
       );
       oauth2Client.setCredentials(creds);
 
-      // Verify token is still valid (will auto-refresh if needed)
       await oauth2Client.getAccessToken();
 
-      this.auth = oauth2Client;
-      this.searchconsole = google.searchconsole({ version: 'v1', auth: this.auth });
+      auth = oauth2Client;
+      searchconsole = google.searchconsole({ version: 'v1', auth });
       return true;
     } catch (err) {
-      // Log the actual error for debugging
       console.error('Authentication error:', err.message);
       throw err;
     }
   }
 
-  async initiateOAuth() {
+  async function initiateOAuth() {
     if (!process.env.GSC_CLIENT_ID || !process.env.GSC_CLIENT_SECRET) {
       throw new Error('GSC_CLIENT_ID and GSC_CLIENT_SECRET must be set in environment');
     }
@@ -63,7 +55,6 @@ export class GSCClient {
     console.log('Opening browser for authentication...');
     await open(authUrl);
 
-    // Start local server to receive callback
     const code = await new Promise((resolve) => {
       const server = createServer((req, res) => {
         if (req.url?.startsWith('/oauth/callback')) {
@@ -80,44 +71,34 @@ export class GSCClient {
     const { tokens } = await oauth2Client.getToken(code);
     oauth2Client.setCredentials(tokens);
 
-    // Save credentials
-    await fs.writeFile(this.credentialsPath, JSON.stringify(tokens, null, 2));
+    await fs.writeFile(credentialsPath, JSON.stringify(tokens, null, 2));
 
-    this.auth = oauth2Client;
-    this.searchconsole = google.searchconsole({ version: 'v1', auth: this.auth });
+    auth = oauth2Client;
+    searchconsole = google.searchconsole({ version: 'v1', auth });
   }
 
-  async getPagePerformance(siteUrl, startDate, endDate, dimensions = ['page']) {
-    const response = await this.searchconsole.searchanalytics.query({
+  async function getPagePerformance(siteUrl, startDate, endDate, dimensions = ['page']) {
+    const response = await searchconsole.searchanalytics.query({
       siteUrl,
-      requestBody: {
-        startDate,
-        endDate,
-        dimensions,
-        rowLimit: 25000,
-      },
+      requestBody: { startDate, endDate, dimensions, rowLimit: 25000 },
     });
-
     return response.data.rows || [];
   }
 
-  async getPagePerformanceByPage(siteUrl, page, startDate, endDate) {
-    const response = await this.searchconsole.searchanalytics.query({
+  async function getPagePerformanceByPage(siteUrl, page, startDate, endDate) {
+    const response = await searchconsole.searchanalytics.query({
       siteUrl,
       requestBody: {
         startDate,
         endDate,
         dimensions: ['page'],
         dimensionFilterGroups: [{
-          filters: [{
-            dimension: 'page',
-            expression: page,
-            operator: 'equals'
-          }]
+          filters: [{ dimension: 'page', expression: page, operator: 'equals' }]
         }],
       },
     });
-
     return response.data.rows?.[0] || null;
   }
+
+  return { authenticate, initiateOAuth, getPagePerformance, getPagePerformanceByPage };
 }
