@@ -1,0 +1,46 @@
+{
+  "name": "@warpmetrics/meta-gen",
+  "version": "0.1.0",
+  "description": "Self-improving meta description generator with Google Search Console feedback",
+  "type": "module",
+  "bin": {
+    "meta-gen": "./src/cli/index.js"
+  },
+  "exports": {
+    ".": "./src/index.js",
+    "./react": "./src/integrations/react-hook.js",
+    "./core/*": "./src/core/*.js"
+  },
+  "files": [
+    "src",
+    "!src/**/*.test.js"
+  ],
+  "scripts": {
+    "dev": "node src/cli/index.js",
+    "test": "echo 'Tests coming soon' && exit 0",
+    "preversion": "npm test",
+    "release:patch": "npm version patch && git push origin main --tags",
+    "release:minor": "npm version minor && git push origin main --tags"
+  },
+  "dependencies": {
+    "@warpmetrics/warp": "^0.0.13",
+    "openai": "^4.77.3",
+    "googleapis": "^144.0.0",
+    "commander": "^12.1.0",
+    "chalk": "^5.4.1",
+    "ora": "^8.1.1",
+    "inquirer": "^12.3.0",
+    "dotenv": "^16.4.7",
+    "open": "^10.1.0"
+  },
+  "keywords": ["seo", "meta-descriptions", "google-search-console", "self-improving", "ai"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/warpmetrics/meta-gen.git"
+  },
+  "homepage": "https://github.com/warpmetrics/meta-gen#readme",
+  "bugs": {
+    "url": "https://github.com/warpmetrics/meta-gen/issues"
+  }
+}

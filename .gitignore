@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Testing
+.gsc-credentials.json
+prompts/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store

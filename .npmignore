@@ -1,0 +1,15 @@
+# Test files
+test-data.js
+*.test.js
+
+# Example workflows (users should copy these, not use from package)
+.github/workflows/meta-generate.yml
+.github/workflows/meta-feedback.yml
+
+# Development files
+.gsc-credentials.json
+meta-gen.config.json
+prompts/
+
+# Logs
+*.log
