@@ -9,11 +9,14 @@ export async function authCommand() {
     const client = new GSCClient('./.gsc-credentials.json');
 
     // Check if already authenticated
-    const isAuth = await client.authenticate();
-
-    if (isAuth) {
-      spinner.succeed('Already authenticated!');
-      process.exit(0);
+    try {
+      const isAuth = await client.authenticate();
+      if (isAuth) {
+        spinner.succeed('Already authenticated!');
+        process.exit(0);
+      }
+    } catch {
+      // Not authenticated or token expired — proceed to OAuth
     }
 
     spinner.text = 'Opening browser for OAuth...';

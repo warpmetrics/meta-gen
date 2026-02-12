@@ -11,13 +11,9 @@ export async function analyzeCommand(options) {
     const config = JSON.parse(await fs.readFile('./meta-gen.config.json', 'utf-8'));
 
     const gsc = new GSCClient('./.gsc-credentials.json');
-    const authenticated = await gsc.authenticate();
 
-    if (!authenticated) {
-      spinner.fail('Authentication failed');
-      console.log(chalk.yellow('\nRun meta-gen auth first to authenticate with Google Search Console'));
-      process.exit(1);
-    }
+    spinner.text = 'Authenticating with Google Search Console...';
+    await gsc.authenticate();
 
     spinner.text = 'Fetching performance data from Google Search Console...';
 
@@ -36,8 +32,23 @@ export async function analyzeCommand(options) {
 
     // Filter and sort
     const minImpressions = parseInt(options.minImpressions);
+    const excludePatterns = config.exclude || [];
+
     const filtered = rows
-      .filter(row => row.impressions >= minImpressions)
+      .filter(row => {
+        // Check impressions threshold
+        if (row.impressions < minImpressions) return false;
+
+        // Check exclude patterns
+        const url = row.keys[0];
+        const pathname = new URL(url).pathname;
+        const shouldExclude = excludePatterns.some(pattern => {
+          const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
+          return regex.test(pathname);
+        });
+
+        return !shouldExclude;
+      })
       .sort((a, b) => a.ctr - b.ctr);
 
     // Display results
@@ -57,7 +68,7 @@ export async function analyzeCommand(options) {
       console.log(`   CTR: ${chalk.red((row.ctr * 100).toFixed(2) + '%')} | Impressions: ${chalk.gray(row.impressions.toLocaleString())}\n`);
     });
 
-    console.log(chalk.gray(`Run ${chalk.white('meta-gen generate')} to create improved descriptions`));
+    console.log(chalk.gray(`Run ${chalk.white('meta-gen run')} to generate improved descriptions`));
 
   } catch (err) {
     spinner.fail('Analysis failed');

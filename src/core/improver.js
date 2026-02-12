@@ -1,6 +1,8 @@
-// Self-improvement engine
+// Self-improvement engine — learns from feedback outcomes and generation failures
 import OpenAI from 'openai';
-import { warp, run, call, outcome, act, ref, flush } from '@warpmetrics/warp';
+import { warp, call, outcome } from '@warpmetrics/warp';
+
+const API_BASE = 'https://api.warpmetrics.com/v1';
 
 export class Improver {
   constructor(warpmetricsApiKey, openaiApiKey, promptManager) {
@@ -9,45 +11,52 @@ export class Improver {
     this.promptManager = promptManager;
   }
 
-  async analyze(domain) {
-    const r = run('Self Improvement Analysis', { domain });
+  async fetchOutcomes(name, from) {
+    const results = [];
+    let offset = 0;
+    const limit = 100;
 
-    // Fetch performance tracking outcomes (these are created by PerformanceTracker)
-    const fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    const response = await fetch(
-      `https://api.warpmetrics.com/v1/outcomes?from=${fromDate}`,
-      {
+    while (true) {
+      const params = new URLSearchParams({ name, from, limit: String(limit), offset: String(offset) });
+      const res = await fetch(`${API_BASE}/outcomes?${params}`, {
         headers: { 'Authorization': `Bearer ${this.warpmetricsApiKey}` }
-      }
-    );
+      });
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch outcomes: ${response.statusText}`);
+      if (!res.ok) throw new Error(`Failed to fetch ${name} outcomes: ${res.statusText}`);
+
+      const body = await res.json();
+      results.push(...body.data);
+
+      if (!body.pagination?.hasMore) break;
+      offset += limit;
     }
 
-    const outcomes = await response.json();
+    return results;
+  }
 
-    // Filter for performance tracking outcomes (from feedback collection)
-    const performanceOutcomes = outcomes.filter(o =>
-      o.targetLabel === 'Performance Tracking' && o.opts?.generationRunId
-    );
+  async analyze(grp, domain) {
+    const fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    // Identify high performers (CTR increased by 20%+)
-    const highPerformers = performanceOutcomes
-      .filter(o => o.name === 'High CTR' && o.opts?.description)
+    // Fetch the three outcome types we need in parallel
+    const [highCTROutcomes, noImprovementOutcomes, genFailureOutcomes] = await Promise.all([
+      this.fetchOutcomes('High CTR', fromDate),
+      this.fetchOutcomes('No Improvement', fromDate),
+      this.fetchOutcomes('Generation Failed', fromDate),
+    ]);
+
+    const highPerformers = highCTROutcomes
+      .filter(o => o.opts?.description)
       .map(o => ({
         page: o.opts.page,
         title: o.opts.title,
         description: o.opts.description,
         ctr: o.opts.ctr,
         improvement: o.opts.improvement,
-        baselineCTR: o.opts.baselineCTR,
-        impressions: o.opts.impressions
+        baselineCTR: o.opts.baselineCTR
       }));
 
-    // Identify low performers
-    const lowPerformers = performanceOutcomes
-      .filter(o => o.name === 'No Improvement' && o.opts?.description)
+    const lowPerformers = noImprovementOutcomes
+      .filter(o => o.opts?.description)
       .map(o => ({
         page: o.opts.page,
         title: o.opts.title,
@@ -56,32 +65,48 @@ export class Improver {
         baselineCTR: o.opts.baselineCTR
       }));
 
+    const generationFailures = genFailureOutcomes
+      .filter(o => o.opts?.lastReason)
+      .map(o => ({
+        page: o.opts.page,
+        attempts: o.opts.attempts,
+        lastReason: o.opts.lastReason,
+        history: o.opts.history
+      }));
+
     if (highPerformers.length < 5) {
-      outcome(r, 'Insufficient Data', {
+      outcome(grp, 'Insufficient Data', {
         highPerformers: highPerformers.length,
         needed: 5
       });
-      await flush();
       return null;
     }
 
-    // Use LLM to identify patterns
-    const analysisRes = await this.openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [{
-        role: 'user',
-        content: `Analyze these meta descriptions and identify patterns that correlate with high CTR.
+    // Build analysis prompt
+    let analysisPrompt = `Analyze these meta descriptions and identify patterns that correlate with high CTR.
 
 HIGH PERFORMERS (20%+ CTR increase):
 ${JSON.stringify(highPerformers.slice(0, 10), null, 2)}
 
 LOW PERFORMERS (no improvement or decline):
-${JSON.stringify(lowPerformers.slice(0, 10), null, 2)}
+${JSON.stringify(lowPerformers.slice(0, 10), null, 2)}`;
+
+    if (generationFailures.length > 0) {
+      analysisPrompt += `
+
+GENERATION FAILURES (couldn't pass quality validation after multiple retries):
+${JSON.stringify(generationFailures.slice(0, 10), null, 2)}
+
+Also analyze why generation fails for these pages and suggest prompt improvements to handle them.`;
+    }
+
+    analysisPrompt += `
 
 Identify:
 1. Common patterns in high performers (word choice, structure, elements)
 2. Common mistakes in low performers
 3. Specific actionable improvements
+${generationFailures.length > 0 ? '4. Why generation fails for certain page types and how to fix it' : ''}
 
 Return JSON:
 {
@@ -93,13 +118,17 @@ Return JSON:
       "confidence": "high"
     }
   ],
-  "improvements": "Specific changes to make to the generation prompt"
-}`
-      }],
+  "improvements": "Specific changes to make to the generation prompt",
+  "failureInsights": ["insight about why generation fails for certain pages"]
+}`;
+
+    const analysisRes = await this.openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [{ role: 'user', content: analysisPrompt }],
       response_format: { type: 'json_object' }
     });
 
-    call(r, analysisRes);
+    call(grp, analysisRes);
 
     const analysis = JSON.parse(analysisRes.choices[0].message.content);
 
@@ -111,37 +140,15 @@ Return JSON:
       });
     }
 
-    // Update quality prompt
-    const currentQuality = await this.promptManager.getSystemPrompt();
-    const improvedQuality = await this.generateImprovedPrompt(
-      currentQuality,
-      analysis.improvements
-    );
+    // Update quality prompt with improvements and failure insights
+    const currentPrompt = await this.promptManager.getSystemPrompt();
 
-    await this.promptManager.updateQualityPrompt(improvedQuality);
+    let updateInstructions = `IMPROVEMENTS TO MAKE:\n${analysis.improvements}`;
+    if (analysis.failureInsights?.length) {
+      updateInstructions += `\n\nFAILURE INSIGHTS (the generator struggles with these — address them):\n${analysis.failureInsights.join('\n')}`;
+    }
 
-    const oc = outcome(r, 'Improvement Applied', {
-      patternsLearned: analysis.patterns.length,
-      highPerformers: highPerformers.length,
-      lowPerformers: lowPerformers.length
-    });
-
-    // Create act: we're going to apply these learnings in the next generation
-    const applyAct = act(oc, 'Apply Improvements', {
-      patterns: analysis.patterns.map(p => p.description),
-      sampleSize: highPerformers.length
-    });
-
-    await flush();
-
-    return {
-      analysis,
-      actRef: ref(applyAct)
-    };
-  }
-
-  async generateImprovedPrompt(currentPrompt, improvements) {
-    const res = await this.openai.chat.completions.create({
+    const improvedRes = await this.openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [{
         role: 'user',
@@ -150,13 +157,25 @@ Return JSON:
 CURRENT PROMPT:
 ${currentPrompt}
 
-IMPROVEMENTS TO MAKE:
-${improvements}
+${updateInstructions}
 
 Return the updated prompt. Keep the structure, just integrate the improvements.`
       }]
     });
 
-    return res.choices[0].message.content;
+    call(grp, improvedRes);
+
+    await this.promptManager.updateQualityPrompt(improvedRes.choices[0].message.content);
+
+    outcome(grp, 'Patterns Learned', {
+      count: analysis.patterns.length,
+      patterns: analysis.patterns.map(p => p.description),
+      failureInsights: analysis.failureInsights || [],
+      highPerformers: highPerformers.length,
+      lowPerformers: lowPerformers.length,
+      generationFailures: generationFailures.length
+    });
+
+    return { patternsLearned: analysis.patterns.length };
   }
 }

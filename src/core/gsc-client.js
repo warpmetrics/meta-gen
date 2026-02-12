@@ -15,26 +15,30 @@ export class GSCClient {
     // Check if credentials exist
     try {
       const creds = JSON.parse(await fs.readFile(this.credentialsPath, 'utf-8'));
-      this.auth = google.auth.fromJSON(creds);
 
-      // Set credentials if it's an OAuth2 client
-      if (this.auth.credentials) {
-        await this.auth.getAccessToken(); // Verify token
-      } else {
-        // It's a stored token object
-        const oauth2Client = new google.auth.OAuth2(
-          process.env.GSC_CLIENT_ID,
-          process.env.GSC_CLIENT_SECRET,
-          'http://localhost:3456/oauth/callback'
-        );
-        oauth2Client.setCredentials(creds);
-        this.auth = oauth2Client;
+      // Check if we have the required env vars for token-based auth
+      if (!process.env.GSC_CLIENT_ID || !process.env.GSC_CLIENT_SECRET) {
+        throw new Error('GSC_CLIENT_ID and GSC_CLIENT_SECRET environment variables must be set');
       }
 
+      // Create OAuth2 client and set stored credentials
+      const oauth2Client = new google.auth.OAuth2(
+        process.env.GSC_CLIENT_ID,
+        process.env.GSC_CLIENT_SECRET,
+        'http://localhost:3456/oauth/callback'
+      );
+      oauth2Client.setCredentials(creds);
+
+      // Verify token is still valid (will auto-refresh if needed)
+      await oauth2Client.getAccessToken();
+
+      this.auth = oauth2Client;
       this.searchconsole = google.searchconsole({ version: 'v1', auth: this.auth });
       return true;
     } catch (err) {
-      return false;
+      // Log the actual error for debugging
+      console.error('Authentication error:', err.message);
+      throw err;
     }
   }
 
