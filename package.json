@@ -1,6 +1,6 @@
 {
   "name": "@warpmetrics/meta-gen",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Self-improving meta description generator with Google Search Console feedback",
   "type": "module",
   "bin": {
@@ -33,7 +33,13 @@
     "dotenv": "^16.4.7",
     "open": "^10.1.0"
   },
-  "keywords": ["seo", "meta-descriptions", "google-search-console", "self-improving", "ai"],
+  "keywords": [
+    "seo",
+    "meta-descriptions",
+    "google-search-console",
+    "self-improving",
+    "ai"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
