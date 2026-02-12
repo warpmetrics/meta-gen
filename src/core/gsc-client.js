@@ -25,7 +25,7 @@ export class GSCClient {
         const oauth2Client = new google.auth.OAuth2(
           process.env.GSC_CLIENT_ID,
           process.env.GSC_CLIENT_SECRET,
-          'http://localhost:3000/oauth/callback'
+          'http://localhost:3456/oauth/callback'
         );
         oauth2Client.setCredentials(creds);
         this.auth = oauth2Client;
@@ -43,10 +43,11 @@ export class GSCClient {
       throw new Error('GSC_CLIENT_ID and GSC_CLIENT_SECRET must be set in environment');
     }
 
+    const CALLBACK_PORT = 3456;
     const oauth2Client = new google.auth.OAuth2(
       process.env.GSC_CLIENT_ID,
       process.env.GSC_CLIENT_SECRET,
-      'http://localhost:3000/oauth/callback'
+      `http://localhost:${CALLBACK_PORT}/oauth/callback`
     );
 
     const scopes = ['https://www.googleapis.com/auth/webmasters.readonly'];
@@ -62,14 +63,14 @@ export class GSCClient {
     const code = await new Promise((resolve) => {
       const server = createServer((req, res) => {
         if (req.url?.startsWith('/oauth/callback')) {
-          const urlParams = new URL(req.url, 'http://localhost:3000').searchParams;
+          const urlParams = new URL(req.url, `http://localhost:${CALLBACK_PORT}`).searchParams;
           const code = urlParams.get('code');
           res.writeHead(200, { 'Content-Type': 'text/html' });
           res.end('<h1>Authentication successful!</h1><p>You can close this window.</p>');
           server.close();
           resolve(code);
         }
-      }).listen(3000);
+      }).listen(CALLBACK_PORT);
     });
 
     const { tokens } = await oauth2Client.getToken(code);
