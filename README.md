@@ -141,7 +141,9 @@ The hook updates `<title>`, `meta[name="description"]`, Open Graph, and Twitter 
 
 ## GitHub Actions
 
-Run `meta-gen run` weekly and create a PR with the results:
+Add this workflow to your project at `.github/workflows/meta-gen.yml`. It runs `meta-gen run` weekly and opens a PR with the updated `src/meta.json`. If nothing changed, no PR is created.
+
+You'll need to add these repository secrets: `GSC_CREDENTIALS` (contents of `.gsc-credentials.json` from `meta-gen auth`), `OPENAI_API_KEY`, `WARPMETRICS_API_KEY`, `GSC_CLIENT_ID`, `GSC_CLIENT_SECRET`.
 
 ```yaml
 name: Meta Gen
