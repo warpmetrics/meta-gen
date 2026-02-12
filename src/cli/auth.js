@@ -13,7 +13,7 @@ export async function authCommand() {
 
     if (isAuth) {
       spinner.succeed('Already authenticated!');
-      return;
+      process.exit(0);
     }
 
     spinner.text = 'Opening browser for OAuth...';
@@ -22,6 +22,7 @@ export async function authCommand() {
     spinner.succeed('Authentication successful!');
     console.log(chalk.gray('Credentials saved to .gsc-credentials.json'));
     console.log(chalk.yellow('\nWARNING: Add .gsc-credentials.json to .gitignore'));
+    process.exit(0);
   } catch (err) {
     spinner.fail('Authentication failed');
     console.error(chalk.red(err.message));
