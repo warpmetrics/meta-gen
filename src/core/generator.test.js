@@ -81,6 +81,13 @@ describe('generate', () => {
     expect(results).toHaveLength(1);
     expect(failures).toHaveLength(0);
     expect(openai.chat.completions.create).toHaveBeenCalledTimes(2);
+
+    // Verify retry includes rejection history
+    const retryCall = openai.chat.completions.create.mock.calls[1][0];
+    const retryMsg = retryCall.messages.find(m => m.content?.includes('REJECTED'));
+    expect(retryMsg.content).toContain('Too short');
+    expect(retryMsg.content).toContain('fundamentally different');
+
     expect(outcome).toHaveBeenCalledWith(grp, 'Validation Failed', expect.objectContaining({
       reason: 'Too short',
       attempt: 1,

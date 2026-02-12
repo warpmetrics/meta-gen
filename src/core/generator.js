@@ -50,7 +50,6 @@ export async function generate(openai, promptManager, grp, pages, options = {}) 
 }
 
 async function generateWithRetry(openai, grp, systemPrompt, page, { maxRetries, validators, ctx }) {
-  let lastGenerated = null;
   let lastReason = null;
   const failureHistory = [];
 
@@ -60,11 +59,14 @@ async function generateWithRetry(openai, grp, systemPrompt, page, { maxRetries, 
       { role: 'user', content: buildUserPrompt(page) }
     ];
 
-    if (lastGenerated && lastReason) {
-      messages.push(
-        { role: 'assistant', content: JSON.stringify(lastGenerated) },
-        { role: 'user', content: `That failed validation: ${lastReason}. Fix and regenerate.` }
-      );
+    if (failureHistory.length > 0) {
+      const rejections = failureHistory.map((f, i) =>
+        `Attempt ${f.attempt}: "${f.generated.description}" — REJECTED: ${f.reason}`
+      ).join('\n');
+      messages.push({
+        role: 'user',
+        content: `Previous attempts were all rejected. Do NOT make minor tweaks — write something fundamentally different.\n\n${rejections}`
+      });
     }
 
     const res = await openai.chat.completions.create({
@@ -118,7 +120,7 @@ async function generateWithRetry(openai, grp, systemPrompt, page, { maxRetries, 
       return generated;
     }
 
-    failureHistory.push({ attempt, reason: failed });
+    failureHistory.push({ attempt, reason: failed, generated });
 
     outcome(grp, 'Validation Failed', {
       page: page.url,
@@ -126,7 +128,6 @@ async function generateWithRetry(openai, grp, systemPrompt, page, { maxRetries, 
       attempt
     });
 
-    lastGenerated = generated;
     lastReason = failed;
   }
 
