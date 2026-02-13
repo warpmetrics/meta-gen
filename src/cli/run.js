@@ -197,7 +197,8 @@ export async function runCommand(options) {
     // ═══════════════════════════════════════════
     // Run complete — link to next run
     // ═══════════════════════════════════════════
-    const runComplete = outcome(r, 'Run Complete', {
+    const allFailed = genResults.results.length === 0 && genResults.failures.length > 0;
+    const runComplete = outcome(r, allFailed ? 'Run Failed' : 'Run Complete', {
       generated: genResults.results.length,
       generationFailed: genResults.failures.length,
       tracked: feedbackResults.tracked,
