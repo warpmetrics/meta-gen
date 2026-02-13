@@ -43,15 +43,15 @@ describe('createPromptManager', () => {
     it('creates all prompt files when none exist', async () => {
       await pm.initialize();
 
-      expect(fs.mkdir).toHaveBeenCalledWith('/test/prompts', { recursive: true });
+      expect(fs.mkdir).toHaveBeenCalledWith('/test/prompts/meta-gen', { recursive: true });
       expect(fs.writeFile).toHaveBeenCalledTimes(3);
-      expect(store['/test/prompts/patterns.json']).toContain('"patterns"');
+      expect(store['/test/prompts/meta-gen/patterns.json']).toContain('"patterns"');
     });
 
     it('skips existing files', async () => {
-      store['/test/prompts/base.md'] = 'existing base';
-      store['/test/prompts/quality.md'] = 'existing quality';
-      store['/test/prompts/patterns.json'] = '{"patterns":[]}';
+      store['/test/prompts/meta-gen/base.md'] = 'existing base';
+      store['/test/prompts/meta-gen/quality.md'] = 'existing quality';
+      store['/test/prompts/meta-gen/patterns.json'] = '{"patterns":[]}';
 
       await pm.initialize();
 
@@ -61,9 +61,9 @@ describe('createPromptManager', () => {
 
   describe('getSystemPrompt', () => {
     it('combines base and quality prompts without patterns', async () => {
-      store['/test/prompts/base.md'] = '# Base';
-      store['/test/prompts/quality.md'] = '## Quality';
-      store['/test/prompts/patterns.json'] = '{"patterns":[]}';
+      store['/test/prompts/meta-gen/base.md'] = '# Base';
+      store['/test/prompts/meta-gen/quality.md'] = '## Quality';
+      store['/test/prompts/meta-gen/patterns.json'] = '{"patterns":[]}';
 
       const prompt = await pm.getSystemPrompt();
       expect(prompt).toContain('# Base');
@@ -72,9 +72,9 @@ describe('createPromptManager', () => {
     });
 
     it('includes learned patterns when present', async () => {
-      store['/test/prompts/base.md'] = '# Base';
-      store['/test/prompts/quality.md'] = '## Quality';
-      store['/test/prompts/patterns.json'] = JSON.stringify({
+      store['/test/prompts/meta-gen/base.md'] = '# Base';
+      store['/test/prompts/meta-gen/quality.md'] = '## Quality';
+      store['/test/prompts/meta-gen/patterns.json'] = JSON.stringify({
         patterns: [
           { description: 'Use numbers', impact: 2.1, sampleSize: 10 },
         ],
@@ -89,11 +89,11 @@ describe('createPromptManager', () => {
 
   describe('addPattern', () => {
     it('appends pattern with timestamp', async () => {
-      store['/test/prompts/patterns.json'] = '{"patterns":[]}';
+      store['/test/prompts/meta-gen/patterns.json'] = '{"patterns":[]}';
 
       await pm.addPattern({ description: 'Start with verbs', impact: 1.5 });
 
-      const written = JSON.parse(store['/test/prompts/patterns.json']);
+      const written = JSON.parse(store['/test/prompts/meta-gen/patterns.json']);
       expect(written.patterns).toHaveLength(1);
       expect(written.patterns[0].description).toBe('Start with verbs');
       expect(written.patterns[0].addedAt).toBeTruthy();
@@ -102,7 +102,7 @@ describe('createPromptManager', () => {
 
   describe('updateQualityPrompt', () => {
     it('backs up old content and writes new', async () => {
-      store['/test/prompts/quality.md'] = 'old quality content';
+      store['/test/prompts/meta-gen/quality.md'] = 'old quality content';
 
       await pm.updateQualityPrompt('new quality content');
 
@@ -112,7 +112,7 @@ describe('createPromptManager', () => {
       expect(backupCalls).toHaveLength(1);
       expect(backupCalls[0][1]).toBe('old quality content');
 
-      expect(store['/test/prompts/quality.md']).toBe('new quality content');
+      expect(store['/test/prompts/meta-gen/quality.md']).toBe('new quality content');
     });
   });
 });

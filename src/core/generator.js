@@ -1,6 +1,7 @@
 // Generates meta descriptions with validation, retry, and WarpMetrics tracking
 import { call, outcome } from '@warpmetrics/warp';
 import { lengthValidator, qualityValidator } from './validators.js';
+import { MODEL } from './config.js';
 
 export async function generate(openai, promptManager, grp, pages, options = {}) {
   const maxRetries = options.maxRetries || 3;
@@ -70,7 +71,7 @@ async function generateWithRetry(openai, grp, systemPrompt, page, { maxRetries, 
     }
 
     const res = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: MODEL,
       messages,
       temperature: 0.7,
       response_format: {

@@ -1,4 +1,5 @@
 import { outcome, call } from '@warpmetrics/warp';
+import { MODEL } from './config.js';
 
 export function lengthValidator({ min = 140, max = 160 } = {}) {
   return async (generated, page, ctx) => {
@@ -17,7 +18,7 @@ export function lengthValidator({ min = 140, max = 160 } = {}) {
 export function qualityValidator(openai, { threshold = 7 } = {}) {
   return async (generated, page, ctx) => {
     const res = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: MODEL,
       messages: [
         {
           role: 'system',

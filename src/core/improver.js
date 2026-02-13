@@ -1,5 +1,6 @@
 // Self-improvement engine — learns from feedback outcomes and generation failures
 import { call, outcome } from '@warpmetrics/warp';
+import { MODEL } from './config.js';
 
 const API_BASE = 'https://api.warpmetrics.com/v1';
 
@@ -90,7 +91,7 @@ Return JSON:
 }`;
 
   const analysisRes = await openai.chat.completions.create({
-    model: 'gpt-4o',
+    model: MODEL,
     messages: [{ role: 'user', content: analysisPrompt }],
     response_format: { type: 'json_object' }
   });
@@ -114,7 +115,7 @@ Return JSON:
   }
 
   const improvedRes = await openai.chat.completions.create({
-    model: 'gpt-4o',
+    model: MODEL,
     messages: [{
       role: 'user',
       content: `Update this meta description generation prompt with these improvements:

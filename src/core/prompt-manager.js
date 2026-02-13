@@ -96,12 +96,13 @@ No site-specific patterns learned yet. These guidelines will be refined automati
 `;
 
 export function createPromptManager(configDir) {
-  const basePromptPath = path.join(configDir, 'prompts', 'base.md');
-  const qualityPromptPath = path.join(configDir, 'prompts', 'quality.md');
-  const patternsPath = path.join(configDir, 'prompts', 'patterns.json');
+  const promptsDir = path.join(configDir, 'prompts', 'meta-gen');
+  const basePromptPath = path.join(promptsDir, 'base.md');
+  const qualityPromptPath = path.join(promptsDir, 'quality.md');
+  const patternsPath = path.join(promptsDir, 'patterns.json');
 
   async function initialize() {
-    await fs.mkdir(path.join(configDir, 'prompts'), { recursive: true });
+    await fs.mkdir(promptsDir, { recursive: true });
 
     try { await fs.access(basePromptPath); }
     catch { await fs.writeFile(basePromptPath, BASE_PROMPT); }
@@ -132,7 +133,7 @@ export function createPromptManager(configDir) {
 
   async function updateQualityPrompt(newContent) {
     const timestamp = new Date().toISOString().split('T')[0];
-    const backupPath = path.join(configDir, 'prompts', `quality-${timestamp}.md`);
+    const backupPath = path.join(promptsDir, `quality-${timestamp}.md`);
 
     const oldContent = await fs.readFile(qualityPromptPath, 'utf-8');
     await fs.writeFile(backupPath, oldContent);
