@@ -4,6 +4,7 @@ vi.mock('@warpmetrics/warp', () => ({
   warp: (obj) => obj,
   call: vi.fn(),
   outcome: vi.fn(),
+  group: vi.fn((parent, label) => `${parent}-${label}`),
 }));
 
 import { outcome } from '@warpmetrics/warp';
@@ -58,7 +59,8 @@ describe('generate', () => {
     expect(results[0].title).toBe('Great Title');
     expect(results[0].url).toBe('https://example.com/page');
     expect(failures).toHaveLength(0);
-    expect(outcome).toHaveBeenCalledWith(grp, 'Generated', expect.objectContaining({ page: page.url }));
+    const pageGrp = `${grp}-page`;
+    expect(outcome).toHaveBeenCalledWith(pageGrp, 'Generated', expect.objectContaining({ page: page.url }));
   });
 
   it('feeds failure reason back and succeeds on retry', async () => {
@@ -88,7 +90,8 @@ describe('generate', () => {
     expect(retryMsg.content).toContain('Too short');
     expect(retryMsg.content).toContain('fundamentally different');
 
-    expect(outcome).toHaveBeenCalledWith(grp, 'Validation Failed', expect.objectContaining({
+    const pageGrp = `${grp}-page`;
+    expect(outcome).toHaveBeenCalledWith(pageGrp, 'Validation Failed', expect.objectContaining({
       reason: 'Too short',
       attempt: 1,
     }));
@@ -108,7 +111,8 @@ describe('generate', () => {
     expect(failures).toHaveLength(1);
     expect(failures[0].url).toBe(page.url);
     expect(failures[0].attempts).toBe(2);
-    expect(outcome).toHaveBeenCalledWith(grp, 'Generation Failed', expect.objectContaining({
+    const pageGrp = `${grp}-page`;
+    expect(outcome).toHaveBeenCalledWith(pageGrp, 'Generation Failed', expect.objectContaining({
       page: page.url,
       attempts: 2,
     }));
@@ -131,7 +135,8 @@ describe('generate', () => {
     expect(results).toHaveLength(0);
     expect(failures).toHaveLength(1);
     expect(failures[0].lastReason).toBe('API rate limit');
-    expect(outcome).toHaveBeenCalledWith(grp, 'Generation Error', expect.objectContaining({
+    const pageGrp = `${grp}-page`;
+    expect(outcome).toHaveBeenCalledWith(pageGrp, 'Generation Error', expect.objectContaining({
       error: 'API rate limit',
     }));
   });

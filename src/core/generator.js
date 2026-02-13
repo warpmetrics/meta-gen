@@ -1,5 +1,5 @@
 // Generates meta descriptions with validation, retry, and WarpMetrics tracking
-import { call, outcome } from '@warpmetrics/warp';
+import { call, outcome, group } from '@warpmetrics/warp';
 import { lengthValidator, qualityValidator } from './validators.js';
 import { MODEL } from './config.js';
 
@@ -16,9 +16,18 @@ export async function generate(openai, promptManager, grp, pages, options = {}) 
   const ctx = { target: grp, openai };
 
   for (const page of pages) {
+    // Extract slug from URL for the group label
+    const slug = new URL(page.url).pathname.replace(/^\/|\/$/g, '') || 'homepage';
+    const pageGrp = group(grp, slug, {
+      url: page.url,
+      ctr: page.ctr,
+      impressions: page.impressions,
+    });
+    const pageCtx = { target: pageGrp, openai };
+
     try {
       const result = await generateWithRetry(
-        openai, grp, systemPrompt, page, { maxRetries, validators, ctx }
+        openai, pageGrp, systemPrompt, page, { maxRetries, validators, ctx: pageCtx }
       );
 
       if (result.failed) {
@@ -34,7 +43,7 @@ export async function generate(openai, promptManager, grp, pages, options = {}) 
         });
       }
     } catch (err) {
-      outcome(grp, 'Generation Error', {
+      outcome(pageGrp, 'Generation Error', {
         page: page.url,
         error: err.message
       });
