@@ -2,6 +2,7 @@
 import { Command } from 'commander';
 import { authCommand } from './auth.js';
 import { analyzeCommand } from './analyze.js';
+import { initCommand } from './init.js';
 import { runCommand } from './run.js';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
@@ -19,6 +20,11 @@ program
   .name('meta-gen')
   .description('Self-improving meta description generator with Google Search Console')
   .version(version);
+
+program
+  .command('init')
+  .description('Set up meta-gen in your project')
+  .action(initCommand);
 
 program
   .command('auth')

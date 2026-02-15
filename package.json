@@ -13,7 +13,8 @@
   },
   "files": [
     "src",
-    "!src/**/*.test.js"
+    "!src/**/*.test.js",
+    "defaults"
   ],
   "scripts": {
     "dev": "node src/cli/index.js",
@@ -24,7 +25,7 @@
     "release:minor": "npm version minor && git push origin main --tags"
   },
   "dependencies": {
-    "@warpmetrics/warp": "^0.0.13",
+    "@warpmetrics/warp": "^0.0.16",
     "chalk": "^5.4.1",
     "cheerio": "^1.2.0",
     "commander": "^12.1.0",

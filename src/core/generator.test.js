@@ -90,11 +90,9 @@ describe('generate', () => {
     expect(retryMsg.content).toContain('Too short');
     expect(retryMsg.content).toContain('fundamentally different');
 
+    // No redundant 'Validation Failed' outcome — validators record their own outcomes
     const pageGrp = `${grp}-page`;
-    expect(outcome).toHaveBeenCalledWith(pageGrp, 'Validation Failed', expect.objectContaining({
-      reason: 'Too short',
-      attempt: 1,
-    }));
+    expect(outcome).not.toHaveBeenCalledWith(pageGrp, 'Validation Failed', expect.anything());
   });
 
   it('records Generation Failed when max retries exhausted', async () => {

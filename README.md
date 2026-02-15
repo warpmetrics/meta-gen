@@ -30,23 +30,25 @@ Each cycle feeds the next. Descriptions get measurably better over time.
 # 1. Install
 npm install @warpmetrics/meta-gen
 
-# 2. Set up credentials (see Configuration below)
-export OPENAI_API_KEY=sk-proj-...
-export WARPMETRICS_API_KEY=wm_live_...
-export GSC_CLIENT_ID=xxx.apps.googleusercontent.com
-export GSC_CLIENT_SECRET=xxx
+# 2. Interactive setup — creates config, workflow, and sets GitHub secrets
+npx meta-gen init
 
-# 3. Create config
-echo '{"domain":"yoursite.com","siteUrl":"sc-domain:yoursite.com"}' > meta-gen.config.json
-
-# 4. Authenticate with Google Search Console
+# 3. Authenticate with Google Search Console
 npx meta-gen auth
 
-# 5. Run the flywheel
+# 4. Run the flywheel
 npx meta-gen run
 ```
 
 ## Commands
+
+### `meta-gen init`
+
+Interactive setup wizard. Creates `meta-gen.config.json` and `.github/workflows/meta-gen.yml`, sets GitHub secrets via `gh`, and registers outcome classifications with WarpMetrics.
+
+```bash
+npx meta-gen init
+```
 
 ### `meta-gen auth`
 

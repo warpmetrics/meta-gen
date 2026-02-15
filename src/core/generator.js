@@ -131,13 +131,6 @@ async function generateWithRetry(openai, grp, systemPrompt, page, { maxRetries, 
     }
 
     failureHistory.push({ attempt, reason: failed, generated });
-
-    outcome(grp, 'Validation Failed', {
-      page: page.url,
-      reason: failed,
-      attempt
-    });
-
     lastReason = failed;
   }
 
